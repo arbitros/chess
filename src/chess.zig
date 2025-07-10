@@ -150,6 +150,38 @@ pub fn Chess(BOARD_SIZE: u32) type {
 
             pieces_arr: u64[12] = std.mem.zeroes(u64),
 
+            pub fn bitboard_to_arr() arr {
+ const board_arr = blk: {
+  var board_arr
+ for (pieces) |piece| 
+ cnt =0
+ cur: u64 =1
+  while (cnt < 64) {
+  
+  if ((cur & piece) ==1) {
+  board_arr[cnt] = "piece_char"
+  }
+  
+  cnt +=1;
+  if (cnt == 64) break
+  cur <<= 1
+  }
+  break :blk board_arr
+ return board_arr
+}
+
+pub fn draw(self: *BitBoard) void {
+ const board_arr = bitboard_to_arr();
+
+ for (0..board_arr.len) |i| {
+ if (i+1 % 8 == 0) {
+  print("{board_arr[i]/n} ")
+  } else {
+   print("{board_arr[i]} ")
+   }
+  }
+}
+
             pub fn calculate_occupied(self: BitBoard) u64 {
                 const all_pieces: u64 = self.white_pawns | self.white_rooks | self.white_knights |
                     self.white_bishops | self.white_queen | self.white_king | self.black_pawns |
