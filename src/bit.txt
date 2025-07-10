@@ -1,0 +1,23 @@
+pub const BitBoard = struct {
+    all_pieces: u64 = undefined,
+    white_pawns: u64 = 0b1111_1111 << 8,
+    white_rooks: u64 = 0b1000_0001,
+    white_knights: u64 = 0b0100_0010,
+    white_bishops: u64 = 0b0010_0100,
+    white_queen: u64 = 0b0000_1000,
+    white_king: u64 = 0b0001_0000,
+    black_pawns: u64 = 0b1111_1111 << RANK * 6,
+    black_rooks: u64 = 0b1000_0001 << RANK * 7,
+    black_knights: u64 = 0b0100_0010 << RANK * 7,
+    black_bishops: u64 = 0b0010_0100 << RANK * 7,
+    black_queen: u64 = 0b0000_1000 << RANK * 7,
+    black_king: u64 = 0b0001_0000 << RANK * 7,
+
+    pub fn calculate_occupied(self: BitBoard) void {
+        self.all_pieces = self.white_pawns | self.white_rooks | self.white_knights |
+            self.white_bishops | self.white_queen | self.white_king | self.black_pawns |
+            self.black_rooks | self.black_knights | self.black_bishops | self.black_queen |
+            self.black_king;
+    }
+};
+
