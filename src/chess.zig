@@ -211,6 +211,29 @@ pub fn Chess(BOARD_SIZE: u32) type {
                 }
             }
 
+pub fn draw_attack(self: BitBoard, pos: u64, attacks: u64) void {
+cur: u64 = 1;
+var board_arr: [64]u8;
+for (0..63) |i| {
+if (pos & cur != 0) {
+board_arr[i] = 'R';
+} else if (attacks & cur != 0) {
+board_arr[i] = 'o';
+} else {
+board_arr[i] = '-';
+}
+cur <<= 1;
+}
+
+ for (0..board_arr.len) |i| {
+ if (i+1 % 8 == 0) {
+  print("{board_arr[i]/n} ")
+  } else {
+   print("{board_arr[i]} ")
+   }
+  }
+}
+
             pub fn calculate_occupied(self: BitBoard) u64 {
                 const all_pieces: u64 = self.white_pawns | self.white_rooks | self.white_knights |
                     self.white_bishops | self.white_queen | self.white_king | self.black_pawns |
