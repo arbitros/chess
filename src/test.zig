@@ -19,12 +19,12 @@ test {
     const tal3 = tal1 / tal2;
     _ = tal3;
 
-    const a = 0b0110;
+    const a = 0b1110;
     const b = 0b1001;
 
-    std.debug.print("{b}\n", .{a | b});
+    std.debug.print("{b}\n", .{a & b});
 
-    const arr: u8[12] = .{
+    const arr: [12]u8 = .{
         'r', 'R', // rook
         'h', 'H', // knight
         'b', 'B', // bishop
@@ -32,6 +32,5 @@ test {
         'k', 'K', // king
         'p', 'P', // pawn
     };
-
-    std.debug.print("{d}\n", .{c});
+    _ = arr;
 }

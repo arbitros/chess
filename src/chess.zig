@@ -124,9 +124,9 @@ pub fn Chess(BOARD_SIZE: u32) type {
             }
         };
 
-        const RANK = 8;
-
         pub const BitBoard = struct {
+            const RANK = 8;
+
             all_pieces: u64 = 0b1111_1111 << 8 | 0b1000_0001 | 0b0100_0010 | 0b0010_0100 | 0b0000_1000 |
                 0b0001_0000 | 0b1111_1111 << RANK * 6 | 0b1000_0001 << RANK * 7 | 0b0100_0010 << RANK * 7 |
                 0b0010_0100 << RANK * 7 | 0b0000_1000 << RANK * 7 | 0b0001_0000 << RANK * 7,
@@ -148,39 +148,68 @@ pub fn Chess(BOARD_SIZE: u32) type {
             black_pieces: u64 = 0b1111_1111 << RANK * 6 | 0b1000_0001 << RANK * 7 | 0b0100_0010 << RANK * 7 |
                 0b0010_0100 << RANK * 7 | 0b0000_1000 << RANK * 7 | 0b0001_0000 << RANK * 7,
 
-            pieces_arr: u64[12] = std.mem.zeroes(u64),
+            pieces_arr: [12]u64 = std.mem.zeroes([12]u64),
 
-            pub fn bitboard_to_arr() arr {
- const board_arr = blk: {
-  var board_arr
- for (pieces) |piece| 
- cnt =0
- cur: u64 =1
-  while (cnt < 64) {
-  
-  if ((cur & piece) ==1) {
-  board_arr[cnt] = "piece_char"
-  }
-  
-  cnt +=1;
-  if (cnt == 64) break
-  cur <<= 1
-  }
-  break :blk board_arr
- return board_arr
-}
+            const char_arr: [12]u8 = .{
+                'p', 'r',
+                'k', 'b',
+                'q', 's',
+                'P', 'R',
+                'K', 'B',
+                'Q', 'S',
+            };
 
-pub fn draw(self: *BitBoard) void {
- const board_arr = bitboard_to_arr();
+            pub fn bitboard_to_arr(pieces: [12]u64) [64]u8 {
+                const board_arr = blk: {
+                    var board_arr: [64]u8 = std.mem.zeroes([64]u8);
+                    for (pieces, 0..) |piece, i| {
+                        var cnt: u8 = 0;
+                        var cur: u64 = 1;
+                        while (cnt < 64) {
+                            if ((cur & piece) != 0) {
+                                board_arr[cnt] = char_arr[i];
+                            }
 
- for (0..board_arr.len) |i| {
- if (i+1 % 8 == 0) {
-  print("{board_arr[i]/n} ")
-  } else {
-   print("{board_arr[i]} ")
-   }
-  }
-}
+                            cnt += 1;
+                            if (cnt == 64) break;
+                            cur <<= 1;
+                        }
+                    }
+
+                    for (board_arr, 0..) |e, i| {
+                        if (e == 0) {
+                            board_arr[i] = '-';
+                        }
+                    }
+                    break :blk board_arr;
+                };
+
+                return board_arr;
+            }
+
+            pub fn drawBitBoard(self: BitBoard) void {
+                const board_arr = self.bitboard_to_arr(self.pieces_arr);
+
+                for (0..board_arr.len) |i| {
+                    if ((i + 1) % 8 == 0) {
+                        std.debug.print("{c}\n", .{board_arr[i]});
+                    } else {
+                        std.debug.print("{c} ", .{board_arr[i]});
+                    }
+                }
+            }
+
+            pub fn draw_attack(self: BitBoard, pos: u64, attack: u64) void {
+                const board_arr = self.bitboard_to_arr(pieces);
+
+                for (0..board_arr.len) |i| {
+                    if ((i + 1) % 8 == 0) {
+                        std.debug.print("{c}\n", .{board_arr[i]});
+                    } else {
+                        std.debug.print("{c} ", .{board_arr[i]});
+                    }
+                }
+            }
 
             pub fn calculate_occupied(self: BitBoard) u64 {
                 const all_pieces: u64 = self.white_pawns | self.white_rooks | self.white_knights |
@@ -202,7 +231,7 @@ pub fn draw(self: *BitBoard) void {
                 return black_pieces;
             }
 
-            pub fn calculate_array(self: BitBoard) void {
+            pub fn calculate_array(self: *BitBoard) void {
                 self.pieces_arr[0] = self.white_pawns;
                 self.pieces_arr[1] = self.white_rooks;
                 self.pieces_arr[2] = self.white_knights;
@@ -274,10 +303,14 @@ pub fn draw(self: *BitBoard) void {
 
 test {
     const chessType = Chess(8);
-    const chess = chessType.initBase();
+    var chess = chessType.initBase();
     chess.print();
     const black = chess.bitboard.calculate_black();
     const white = chess.bitboard.calculate_white();
     const attack = chess.bitboard.attacks(0b1 << 21, chessType.Pieces{ .rook = .white });
     std.debug.print("{b}\n{b}\n{b}\n", .{ black, white, attack });
+
+    chess.bitboard.calculate_array();
+    std.debug.print("\n", .{});
+    chess.bitboard.draw();
 }
