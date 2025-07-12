@@ -54,26 +54,26 @@ pub fn Chess() type {
         pub const BitBoard = struct {
             const RANK = 8;
 
-            all_pieces: u64 = 0b1111_1111 << 8 | 0b1000_0001 | 0b0100_0010 | 0b0010_0100 | 0b0000_1000 |
+            all_pieces: u64 = 0b1111_1111 << 8 | 0b1000_0001 | 0b0100_0010 | 0b0010_0100 | 0b0001_0000 |
                 0b0001_0000 | 0b1111_1111 << RANK * 6 | 0b1000_0001 << RANK * 7 | 0b0100_0010 << RANK * 7 |
-                0b0010_0100 << RANK * 7 | 0b0000_1000 << RANK * 7 | 0b0001_0000 << RANK * 7,
+                0b0010_0100 << RANK * 7 | 0b0001_0000 << RANK * 7 | 0b0000_1000 << RANK * 7,
 
             white_pawns: u64 = 0b1111_1111 << 8,
             white_rooks: u64 = 0b1000_0001,
             white_knights: u64 = 0b0100_0010,
             white_bishops: u64 = 0b0010_0100,
-            white_queen: u64 = 0b0000_1000,
-            white_king: u64 = 0b0001_0000,
-            white_pieces: u64 = 0b1111_1111 | 0b1000_0001 | 0b0100_0010 | 0b0010_0100 | 0b0000_1000 | 0b0001_0000,
+            white_queen: u64 = 0b0001_0000,
+            white_king: u64 = 0b0000_1000,
+            white_pieces: u64 = 0b1111_1111 | 0b1000_0001 | 0b0100_0010 | 0b0010_0100 | 0b0001_0000 | 0b0000_1000,
 
             black_pawns: u64 = 0b1111_1111 << RANK * 6,
             black_rooks: u64 = 0b1000_0001 << RANK * 7,
             black_knights: u64 = 0b0100_0010 << RANK * 7,
             black_bishops: u64 = 0b0010_0100 << RANK * 7,
-            black_queen: u64 = 0b0000_1000 << RANK * 7,
-            black_king: u64 = 0b0001_0000 << RANK * 7,
+            black_queen: u64 = 0b0001_0000 << RANK * 7,
+            black_king: u64 = 0b0000_1000 << RANK * 7,
             black_pieces: u64 = 0b1111_1111 << RANK * 6 | 0b1000_0001 << RANK * 7 | 0b0100_0010 << RANK * 7 |
-                0b0010_0100 << RANK * 7 | 0b0000_1000 << RANK * 7 | 0b0001_0000 << RANK * 7,
+                0b0010_0100 << RANK * 7 | 0b0001_0000 << RANK * 7 | 0b0000_1000 << RANK * 7,
 
             pieces_arr: [12]u64 = std.mem.zeroes([12]u64),
 
@@ -86,30 +86,30 @@ pub fn Chess() type {
                 'Q', 'S',
             };
 
-            pub fn bitboard_to_arr(self: BitBoard, pieces: [12]u64) [64]u8 {
+            pub fn bitboard_to_arr(self: BitBoard, pieces: [12]u64) [8][8]u8 { // column, row
                 _ = self;
                 const board_arr = blk: {
-                    var board_arr: [64]u8 = std.mem.zeroes([64]u8);
-                    for (pieces, 0..) |piece, i| {
-                        var cnt: u8 = 0;
-                        var cur: u64 = 1;
-                        while (cnt < 64) {
-                            if ((cur & piece) != 0) {
-                                board_arr[cnt] = char_arr[i];
+                    var board: [8][8]u8 = undefined;
+
+                    for (0..64) |i| {
+                        const row = @as(u8, @intCast(i / 8));
+                        const col = @as(u8, @intCast(i % 8));
+
+                        var found = false;
+
+                        for (pieces, 0..) |piece, idx| {
+                            if ((piece & (@as(u64, 1) << @as(u6, @intCast(i)))) != 0) {
+                                board[row][col] = char_arr[idx];
+                                found = true;
+                                break;
                             }
+                        }
 
-                            cnt += 1;
-                            if (cnt == 64) break;
-                            cur <<= 1;
+                        if (!found) {
+                            board[row][col] = '-';
                         }
                     }
-
-                    for (board_arr, 0..) |e, i| {
-                        if (e == 0) {
-                            board_arr[i] = '-';
-                        }
-                    }
-                    break :blk board_arr;
+                    break :blk board;
                 };
 
                 return board_arr;
@@ -118,34 +118,40 @@ pub fn Chess() type {
             pub fn drawBitBoard(self: BitBoard) void {
                 const board_arr = self.bitboard_to_arr(self.pieces_arr);
 
-                for (0..board_arr.len) |i| {
-                    if ((i + 1) % 8 == 0) {
-                        std.debug.print("{c}\n", .{board_arr[i]});
-                    } else {
-                        std.debug.print("{c} ", .{board_arr[i]});
+                for (0..8) |i| {
+                    for (0..8) |j| {
+                        const k = 7 - i;
+                        if ((j + 1) % 8 == 0) {
+                            std.debug.print("{c}\n", .{board_arr[k][j]});
+                        } else {
+                            std.debug.print("{c} ", .{board_arr[k][j]});
+                        }
                     }
                 }
             }
 
-            pub fn draw_attack(pos: u64, attackboard: u64) void {
-                var cur: u64 = 1;
-                var board_arr: [64]u8 = std.mem.zeroes([64]u8);
-                for (&board_arr) |*e| {
-                    if (pos & cur != 0) {
-                        e.* = 'P';
-                    } else if (attackboard & cur != 0) {
-                        e.* = 'o';
+            pub fn draw_attack(attackboard: u64) void {
+                var board: [8][8]u8 = undefined;
+
+                for (0..64) |i| {
+                    const row = @as(u8, @intCast(i / 8));
+                    const col = @as(u8, @intCast(i % 8));
+
+                    if ((attackboard & (@as(u64, 1) << @as(u6, @intCast(i)))) != 0) {
+                        board[row][col] = 'o';
                     } else {
-                        e.* = '-';
+                        board[row][col] = '-';
                     }
-                    cur <<= 1;
                 }
 
-                for (0..board_arr.len) |i| {
-                    if ((i + 1) % 8 == 0) {
-                        std.debug.print("{c}\n", .{board_arr[i]});
-                    } else {
-                        std.debug.print("{c} ", .{board_arr[i]});
+                for (0..8) |i| {
+                    for (0..8) |j| {
+                        const k = 7 - i;
+                        if ((j + 1) % 8 == 0) {
+                            std.debug.print("{c}\n", .{board[k][j]});
+                        } else {
+                            std.debug.print("{c} ", .{board[k][j]});
+                        }
                     }
                 }
             }
@@ -190,73 +196,187 @@ pub fn Chess() type {
             const h_file: u64 = 0x8080_8080_8080_8080;
             const top_file: u64 = 0xFF00_0000_0000_0000;
             const bot_file: u64 = 0x0000_0000_0000_00FF;
+            const b_file = a_file << 1;
+            const g_file = h_file >> 1;
+            const row2 = 0x0000_0000_0000_FF00;
+            const row7 = 0x00FF_0000_0000_0000;
 
             pub fn attacks(self: *const BitBoard, pos_in: u64, piece: Pieces) u64 {
-                const org_pos = pos_in;
-                var pos = org_pos;
-
                 switch (piece) {
-                    .rook => {
-                        const boundries: [4]u64 = .{ h_file, top_file, a_file, bot_file };
-                        const dirs = [4]i8{ 1, RANK, -1, -RANK }; // {right, up} with << and {left, down} with >>
-                        var attack_field: u64 = pos;
-
-                        for (dirs, boundries) |dir, boundry| {
-                            pos = org_pos;
-                            while (boundry & pos == 0) {
-                                if (dir > 0) pos <<= @as(u4, @intCast(dir)) else pos >>= @as(u4, @intCast(-dir));
-
-                                if (self.all_pieces & pos != 0) { //piece_collision
-                                    if (piece.rook == Color.white and (self.black_pieces & pos) != 0) { //white
-                                        attack_field |= pos;
-                                        break;
-                                    } else if (piece.rook == Color.black and (self.white_pieces & pos) != 0) { //black
-                                        attack_field |= pos;
-                                        break;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                attack_field |= pos;
-                            }
-                        }
-                        return attack_field;
-                    },
-                    .bishop => {
-                        const dirs: [4]i8 = .{ RANK + 1, -(RANK + 1), RANK - 1, -RANK + 1 }; //UPR, DOR, UPL, DOL
-                        const boundries: [4]u64 = .{
-                            top_file | h_file,
-                            bot_file | h_file,
-                            top_file | a_file,
-                            bot_file | a_file,
-                        };
-
-                        var attack_field: u64 = 0;
-                        var cnt: u8 = 0;
-                        for (dirs, boundries) |dir, boundry| { // INFINITE LOOP AT POS 8 !!!
-                            if ((boundry & pos) != 0) continue;
-                            pos = org_pos;
-                            cnt = 0;
-                            while ((boundry & pos) == 0) {
-                                cnt += 1;
-                                if (cnt > 254) break;
-                                if (dir > 0) pos <<= @as(u4, @intCast(dir)) else pos >>= @as(u4, @intCast(-dir));
-
-                                if ((boundry & pos) != 0) break;
-
-                                if (self.all_pieces & pos != 0) { //piece_collision
-                                    const is_enemy = (piece.bishop == Color.white and (self.black_pieces & pos != 0) or
-                                        (piece.bishop == Color.black and (self.white_pieces & pos) != 0));
-                                    if (is_enemy) attack_field |= pos;
-                                    break;
-                                }
-                                attack_field |= pos;
-                            }
-                        }
-                        return attack_field;
-                    },
+                    .rook => return self.rook_attacks(pos_in, piece.rook),
+                    .bishop => return self.bishop_attacks(pos_in, piece.bishop),
+                    .queen => return self.queen_attacks(pos_in, piece.queen),
+                    .knight => return self.knight_attacks(pos_in, piece.knight),
+                    .pawn => return self.pawn_attacks(pos_in, piece.pawn),
                     else => return 0,
                 }
+            }
+            fn rook_attacks(self: *const BitBoard, pos_in: u64, color: Color) u64 {
+                const boundries: [4]u64 = .{ h_file, top_file, a_file, bot_file };
+                const dirs = [4]i8{ 1, RANK, -1, -RANK }; // {right, up} with << and {left, down} with >>
+                //
+                var pos = pos_in;
+                var attack_field: u64 = 0;
+                for (dirs, boundries) |dir, boundary| {
+                    pos = pos_in;
+                    while ((boundary & pos) == 0 and pos != 0) {
+                        if (dir > 0) pos <<= @as(u6, @intCast(dir)) else pos >>= @as(u6, @intCast(-dir));
+                        if (pos == 0) break;
+
+                        if (self.all_pieces & pos != 0) { //piece_collision
+                            const is_enemy = self.isEnemy(pos, color);
+                            if (is_enemy) attack_field |= pos;
+                            break;
+                        }
+                        attack_field |= pos;
+                    }
+                }
+                return attack_field;
+            }
+
+            fn bishop_attacks(self: *const BitBoard, pos_in: u64, color: Color) u64 {
+                const dirs: [4]i8 = .{ RANK + 1, RANK - 1, -RANK - 1, -RANK + 1 };
+                const boundries: [4]u64 = .{
+                    top_file | h_file, //NE
+                    top_file | a_file, //NW
+                    bot_file | a_file, //BW
+                    bot_file | h_file, //BE
+                };
+
+                var pos = pos_in;
+                var attack_field: u64 = 0;
+                for (dirs, boundries) |dir, boundary| {
+                    pos = pos_in;
+                    while ((boundary & pos) == 0 and pos != 0) {
+                        if (dir > 0) pos <<= @as(u6, @intCast(dir)) else pos >>= @as(u6, @intCast(-dir));
+                        if (pos == 0) break;
+
+                        if (self.all_pieces & pos != 0) { //piece_collision
+                            const is_enemy = self.isEnemy(pos, color);
+                            if (is_enemy) attack_field |= pos;
+                            break;
+                        }
+                        attack_field |= pos;
+                    }
+                }
+                return attack_field;
+            }
+
+            fn queen_attacks(self: *const BitBoard, pos_in: u64, color: Color) u64 {
+                return self.bishop_attacks(pos_in, color) | self.rook_attacks(pos_in, color);
+            }
+
+            fn knight_attacks(self: *const BitBoard, pos_in: u64, color: Color) u64 {
+                const boundaries: [8]u64 = .{
+                    b_file | a_file | bot_file, // LD
+                    g_file | h_file | top_file, // RU
+                    top_file | row7 | h_file, // UR
+                    top_file | row7 | a_file, // UL
+                    b_file | a_file | top_file, // LU
+                    g_file | h_file | bot_file, // RD
+                    row2 | bot_file | a_file, // DL
+                    row2 | bot_file | h_file, // DR
+                };
+
+                const dirs: [8]i6 = .{
+                    -RANK - 2,
+                    RANK + 2,
+                    2 * RANK + 1,
+                    2 * RANK - 1,
+                    RANK - 2,
+                    -RANK + 2,
+                    -2 * RANK - 1,
+                    -2 * RANK + 1,
+                };
+
+                var pos = pos_in;
+                var attack_field: u64 = 0;
+
+                for (dirs, boundaries, 0..) |dir, boundary, i| {
+                    pos = pos_in;
+                    _ = i;
+                    // if (i >= 7) break;
+                    if ((boundary & pos) != 0) continue;
+                    if (dir > 0) pos <<= @as(u6, @intCast(dir)) else pos >>= @as(u6, @intCast(-dir));
+                    if (pos == 0) continue;
+
+                    const is_enemy = self.isEnemy(pos, color);
+                    if (is_enemy) {
+                        attack_field |= pos;
+                        continue;
+                    }
+
+                    attack_field |= pos;
+                }
+                return attack_field;
+            }
+
+            fn pawn_attacks(self: *const BitBoard, pos_in: u64, pawn: Pawn) u64 {
+                const color = pawn.color;
+
+                const boundariesDIAG: [2]u64 = if (color == .white) .{
+                    top_file | a_file,
+                    top_file | h_file,
+                } else .{
+                    bot_file | h_file,
+                    bot_file | a_file,
+                };
+
+                const boundariesFORW: [2]u64 = if (color == .white) .{
+                    top_file,
+                    top_file | row7,
+                } else .{
+                    bot_file,
+                    bot_file | row2,
+                };
+
+                const dirsDIAG: [2]i6 = if (color == .white) .{
+                    RANK - 1, //left
+                    RANK + 1,
+                } else .{
+                    -RANK + 1, //left (seen from piece)
+                    -RANK - 1,
+                };
+
+                const dirsFORW: [2]i6 = if (color == .white) .{
+                    RANK,
+                    2 * RANK,
+                } else .{
+                    -RANK,
+                    -2 * RANK,
+                };
+
+                var pos = pos_in;
+                var attack_field: u64 = 0;
+                for (dirsDIAG, boundariesDIAG) |dir, boundary| {
+                    pos = pos_in;
+                    if ((boundary & pos) != 0) continue;
+                    if (dir > 0) pos <<= @as(u6, @intCast(dir)) else pos >>= @as(u6, @intCast(-dir));
+                    if (pos == 0) continue;
+
+                    const is_enemy = self.isEnemy(pos_in, color);
+                    if (is_enemy) attack_field |= pos;
+                    attack_field |= pos;
+                }
+
+                pos = pos_in;
+                for (dirsFORW, boundariesFORW) |dir, boundary| { // något lurt med dubbelmovet.
+                    if ((boundary & pos) != 0) continue;
+                    if (dir > 0) pos <<= @as(u6, @intCast(dir)) else pos >>= @as(u6, @intCast(-dir));
+                    if (pos == 0) continue;
+
+                    const has_piece: bool = (self.all_pieces & pos) != 0;
+                    if (!has_piece) {
+                        attack_field |= pos;
+                        if (pawn.hasMoved) break;
+                    } else break;
+                }
+                return attack_field;
+            }
+
+            fn isEnemy(self: *const BitBoard, pos: u64, color: Color) bool {
+                return (color == Color.white and (self.black_pieces & pos != 0) or
+                    (color == Color.black and (self.white_pieces & pos) != 0));
             }
         };
     };
@@ -280,15 +400,60 @@ test {
         .bitboard = std.mem.zeroes(chessType.BitBoard),
     };
 
-    //const rookattack = chesstest.bitboard.attacks(0b1 << 0, chessType.Pieces{ .rook = .white });
-    //chessType.BitBoard.draw_attack(0b1 << 0, rookattack);
+    {
+        // const a_file: u64 = 0x0101_0101_01010101;
+        // const h_file: u64 = 0x8080_8080_8080_8080;
+        // const top_file: u64 = 0xFF00_0000_0000_0000;
+        // const bot_file: u64 = 0x0000_0000_0000_00FF;
 
-    //for (0..64) |i| {
-    //    const bishopattack = chesstest.bitboard.attacks(@as(u64, 0b1) << @as(u6, @intCast(i)), chessType.Pieces{ .bishop = .white });
-    //    chessType.BitBoard.draw_attack(@as(u64, 0b1) << @as(u6, @intCast(i)), bishopattack);
-    //    std.time.sleep(std.time.ns_per_s);
-    //}
+        // const b_file = a_file << 1;
+        // const g_file = h_file >> 1;
+        // const row2 = 0x0000_0000_0000_FF00;
+        // const row7 = 0x00FF_0000_0000_0000;
+        const pawn = chessType.Pawn{
+            .color = .white,
+            .hasMoved = false,
+            .justMoved = false,
+        };
+        const piece = chessType.Pieces{ .pawn = pawn };
 
-    const bishopattack = chesstest.bitboard.attacks(@as(u64, 0b1) << 8, chessType.Pieces{ .bishop = .white });
-    chessType.BitBoard.draw_attack(@as(u64, 0b1) << 8, bishopattack);
+        // const pawnattack = chesstest.bitboard.attacks(0b1 << 33, piece);
+        // chessType.BitBoard.draw_attack(pawnattack);
+
+        const pawnattack = chesstest.bitboard.attacks(@as(u64, 0b1) << 34, piece);
+        chessType.BitBoard.draw_attack(pawnattack);
+
+        // for (0..64) |i| {
+        //     const pawnattack = chesstest.bitboard.attacks(@as(u64, 0b1) << @as(u6, @intCast(i)), piece);
+        //     std.debug.print("\x1b[2J\x1b[H", .{});
+        //     chessType.BitBoard.draw_attack(pawnattack | @as(u64, 0b1) << @as(u6, @intCast(i)));
+        //     std.time.sleep(500 * std.time.ns_per_ms);
+        // }
+
+        // chessType.BitBoard.draw_attack(h_file | g_file);
+        // const rookattack = chesstest.bitboard.attacks(0b1 << 35, chessType.Pieces{ .rook = .white });
+        // chessType.BitBoard.draw_attack(rookattack);
+    }
+
+    for (0..64) |i| {
+        const bishopattack = chesstest.bitboard.attacks(@as(u64, 0b1) << @as(u6, @intCast(i)), chessType.Pieces{ .bishop = .white });
+        _ = bishopattack;
+    }
+
+    for (0..64) |i| {
+        const rookattack = chesstest.bitboard.attacks(@as(u64, 0b1) << @as(u6, @intCast(i)), chessType.Pieces{ .rook = .white });
+        // chessType.BitBoard.draw_attack(rookattack);
+        // std.time.sleep(220 * std.time.ns_per_ms);
+        _ = rookattack;
+    }
+
+    for (0..64) |i| {
+        const queenattack = chesstest.bitboard.attacks(@as(u64, 0b1) << @as(u6, @intCast(i)), chessType.Pieces{ .queen = .white });
+        _ = queenattack;
+        // chessType.BitBoard.draw_attack(queenattack);
+        // std.time.sleep(800 * std.time.ns_per_ms);
+    }
+
+    //const bishopattack = chesstest.bitboard.attacks(@as(u64, 0b1) << 8, chessType.Pieces{ .bishop = .white });
+    //chessType.BitBoard.draw_attack(@as(u64, 0b1) << 8, bishopattack);
 }
