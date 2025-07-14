@@ -114,6 +114,37 @@ pub fn Chess() type {
                 'Q', 'S',
             };
 
+            pub fn getPiece(self: *const BitBoard, pos: u64) Pieces {
+                for (self.pieces_arr, 0..) |piece_pos, i| {
+                    if (piece_pos & pos != 0) {
+                        switch (i) {
+                            0 => return Pieces{ .pawn = .init(.white, pos) },
+                            1 => return Pieces{ .rook = .white },
+                            2 => return Pieces{ .knight = .white },
+                            3 => return Pieces{ .bishop = .white },
+                            4 => return Pieces{ .queen = .white },
+                            5 => return Pieces{ .king = .init(.white) },
+
+                            6 => return Pieces{ .pawn = .init(.black, pos) },
+                            7 => return Pieces{ .rook = .black },
+                            8 => return Pieces{ .knight = .black },
+                            9 => return Pieces{ .bishop = .black },
+                            10 => return Pieces{ .queen = .black },
+                            11 => return Pieces{ .king = .init(.black) },
+                        }
+                    }
+                }
+            }
+
+            pub fn removePiece(self: *BitBoard, pos: u64) void {
+                const piece = getPiece(pos);
+                switch (piece) {
+                    .pawn => if (piece.pawn.color == .white) {
+                        self.pieces_arr[0] 
+                    }
+                }
+            }
+
             pub fn bitboard_to_arr(self: BitBoard, pieces: [12]u64) [8][8]u8 { // column, row
                 _ = self;
                 const board_arr = blk: {
