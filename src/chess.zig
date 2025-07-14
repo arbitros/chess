@@ -114,6 +114,14 @@ pub fn Chess() type {
                 'Q', 'S',
             };
 
+            pub fn attackPiece(self: *BitBoard, attacker: u64, victim: u64) void {
+                const piece = getPiece(attacker);
+                const attack_field = getAttack(attacker, piece);
+                if (victim & attack_field != 0) { // CONTINUE
+                    removePiece(victim);
+                }
+            }
+
             pub fn getPiece(self: *const BitBoard, pos: u64) Pieces {
                 for (self.pieces_arr, 0..) |piece_pos, i| {
                     if (piece_pos & pos != 0) {
@@ -136,11 +144,16 @@ pub fn Chess() type {
                 }
             }
 
-            pub fn removePiece(self: *BitBoard, pos: u64) void {
+            pub fn removePiece(chess: *Self, self: *BitBoard, pos: u64) void {
                 const piece = getPiece(pos);
                 switch (piece) {
                     .pawn => if (piece.pawn.color == .white) {
                         self.pieces_arr[0] = self.pieces_arr[0] & ~pos;
+                        for (chess.game.pawns) |*pawn| {
+                            if (pawn.* & pos != 0) {
+                                pawn.* = 0;
+                            }
+                        }
                     } else {
                         self.pieces_arr[6] = self.pieces_arr[6] & ~pos;
                     },
