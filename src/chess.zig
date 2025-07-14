@@ -263,19 +263,30 @@ pub fn Chess() type {
             }
 
             pub fn calculate_array(self: *BitBoard) void {
-                self.pieces_arr[0] = self.white_pawns;
-                self.pieces_arr[1] = self.white_rooks;
-                self.pieces_arr[2] = self.white_knights;
-                self.pieces_arr[3] = self.white_bishops;
-                self.pieces_arr[4] = self.white_queen;
-                self.pieces_arr[5] = self.white_king;
+                self.pieces_arr[0] = white_pawns;
+                self.pieces_arr[1] = white_rooks;
+                self.pieces_arr[2] = white_knights;
+                self.pieces_arr[3] = white_bishops;
+                self.pieces_arr[4] = white_queen;
+                self.pieces_arr[5] = white_king;
 
-                self.pieces_arr[6] = self.black_pawns;
-                self.pieces_arr[7] = self.black_rooks;
-                self.pieces_arr[8] = self.black_knights;
-                self.pieces_arr[9] = self.black_bishops;
-                self.pieces_arr[10] = self.black_queen;
-                self.pieces_arr[11] = self.black_king;
+                self.pieces_arr[6] = black_pawns;
+                self.pieces_arr[7] = black_rooks;
+                self.pieces_arr[8] = black_knights;
+                self.pieces_arr[9] = black_bishops;
+                self.pieces_arr[10] = black_queen;
+                self.pieces_arr[11] = black_king;
+            }
+
+            pub fn getAttack(self: *const BitBoard, pos_in: u64, piece: Pieces) u64 {
+                switch (piece) {
+                    .rook => return self.rook_attacks(pos_in, piece.rook),
+                    .bishop => return self.bishop_attacks(pos_in, piece.bishop),
+                    .queen => return self.queen_attacks(pos_in, piece.queen),
+                    .knight => return self.knight_attacks(pos_in, piece.knight),
+                    .pawn => return self.pawn_attacks(pos_in, piece.pawn),
+                    .king => return self.king_attacks(pos_in, piece.king),
+                }
             }
 
             const a_file: u64 = 0x0101_0101_01010101;
@@ -286,17 +297,6 @@ pub fn Chess() type {
             const g_file = h_file >> 1;
             const row2 = 0x0000_0000_0000_FF00;
             const row7 = 0x00FF_0000_0000_0000;
-
-            pub fn attacks(self: *const BitBoard, pos_in: u64, piece: Pieces) u64 {
-                switch (piece) {
-                    .rook => return self.rook_attacks(pos_in, piece.rook),
-                    .bishop => return self.bishop_attacks(pos_in, piece.bishop),
-                    .queen => return self.queen_attacks(pos_in, piece.queen),
-                    .knight => return self.knight_attacks(pos_in, piece.knight),
-                    .pawn => return self.pawn_attacks(pos_in, piece.pawn),
-                    .king => return self.king_attacks(pos_in, piece.king),
-                }
-            }
             fn rook_attacks(self: *const BitBoard, pos_in: u64, color: Color) u64 {
                 const boundries: [4]u64 = .{ h_file, top_file, a_file, bot_file };
                 const dirs = [4]i8{ 1, RANK, -1, -RANK }; // {right, up} with << and {left, down} with >>
