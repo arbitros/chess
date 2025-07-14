@@ -38,7 +38,7 @@ pub fn Chess() type {
                 return Game{
                     .turn = .white,
                     .kings = .{ .init(.white), .init(.black) },
-                    .pawns = pawns,
+                    .pawns = Pawns.init(),
                 };
             }
         };
@@ -57,6 +57,39 @@ pub fn Chess() type {
             white,
         };
 
+        pub const Pawns = struct {
+            pawns: [16]Pawn,
+
+            pub fn init() Pawns {
+                const pawns = blk: {
+                    var pawns: [16]Pawn = undefined;
+                    for (0..pawns.len) |i| {
+                        if (i < 8) {
+                            const pos: u64 = @as(u64, 8) << @as(u6, @intCast(i));
+                            pawns[i] = .pawn{.init(.white, pos)};
+                        } else {
+                            const pos: u64 = @as(u64, 6 * RANK - 8) << @as(u6, @intCast(i));
+                            pawns[i] = .pawn{.init(.black, pos)};
+                        }
+                    }
+                    break :blk pawns;
+                };
+                return Pawns{ .pawns = pawns };
+            }
+
+            pub fn getPawn(self: Pawns, pos: u64) Pawn {
+                if ()
+            }
+
+            pub fn removePawn(chess: Self, self: *BitBoard, pos: u64) void {
+                self.pieces_arr[0] = self.pieces_arr[0] & ~pos;
+                for (chess.game.pawns) |*pawn| {
+                    if (pawn.* & pos != 0) {
+                        pawn.* = 0;
+                    }
+                }
+            }
+        };
         pub const Pawn = struct { // SPEICAL RULES: En passant, Promotion, Double move
             hasMoved: bool,
             justMoved: bool,
@@ -105,55 +138,33 @@ pub fn Chess() type {
 
             pieces_arr: [12]u64 = std.mem.zeroes([12]u64),
 
-            const char_arr: [12]u8 = .{
-                'p', 'r',
-                'k', 'b',
-                'q', 's',
-                'P', 'R',
-                'K', 'B',
-                'Q', 'S',
-            };
-
-            pub fn attackPiece(self: *BitBoard, attacker: u64, victim: u64) void {
+            pub fn attackPiece(self: *BitBoard, attacker: u64, victim: u64) bool {
                 const piece = getPiece(attacker);
                 const attack_field = getAttack(attacker, piece);
                 if (victim & attack_field != 0) { // CONTINUE
-                    removePiece(victim);
+                    movePiece();
+                    return true;
+                } else {
+                    return false;
                 }
             }
-
-            pub fn getPiece(self: *const BitBoard, pos: u64) Pieces {
-                for (self.pieces_arr, 0..) |piece_pos, i| {
-                    if (piece_pos & pos != 0) {
-                        switch (i) {
-                            0 => return Pieces{ .pawn = .init(.white, pos) },
-                            1 => return Pieces{ .rook = .white },
-                            2 => return Pieces{ .knight = .white },
-                            3 => return Pieces{ .bishop = .white },
-                            4 => return Pieces{ .queen = .white },
-                            5 => return Pieces{ .king = .init(.white) },
-
-                            6 => return Pieces{ .pawn = .init(.black, pos) },
-                            7 => return Pieces{ .rook = .black },
-                            8 => return Pieces{ .knight = .black },
-                            9 => return Pieces{ .bishop = .black },
-                            10 => return Pieces{ .queen = .black },
-                            11 => return Pieces{ .king = .init(.black) },
-                        }
+            pub fn movePiece(chess: Self, self: *BitBoard, from: u64, to: u64) !void {
+                if (to & self.all_pieces != 0) {
+                    return error.Occupied;
+                } else {
+                    removePiece(from);
+                    removePiece(to);
+                    const piece = getPiece(from);
+                    if (piece == .pawn) {
+                        if (piece.pawn.color == .white) {}
                     }
                 }
             }
-
             pub fn removePiece(chess: *Self, self: *BitBoard, pos: u64) void {
                 const piece = getPiece(pos);
                 switch (piece) {
                     .pawn => if (piece.pawn.color == .white) {
-                        self.pieces_arr[0] = self.pieces_arr[0] & ~pos;
-                        for (chess.game.pawns) |*pawn| {
-                            if (pawn.* & pos != 0) {
-                                pawn.* = 0;
-                            }
-                        }
+                        chess.game.removePawn();
                     } else {
                         self.pieces_arr[6] = self.pieces_arr[6] & ~pos;
                     },
@@ -183,8 +194,41 @@ pub fn Chess() type {
                         self.pieces_arr[11] = self.pieces_arr[11] & ~pos;
                     },
                 }
+                self.calculate_black();
+                self.calculate_white();
+                self.calculate_all();
             }
 
+            pub fn getPiece(self: *const BitBoard, pos: u64) Pieces {
+                for (self.pieces_arr, 0..) |piece_pos, i| {
+                    if (piece_pos & pos != 0) {
+                        switch (i) {
+                            0 => return Pieces{ .pawn = .init(.white, pos) },
+                            1 => return Pieces{ .rook = .white },
+                            2 => return Pieces{ .knight = .white },
+                            3 => return Pieces{ .bishop = .white },
+                            4 => return Pieces{ .queen = .white },
+                            5 => return Pieces{ .king = .init(.white) },
+
+                            6 => return Pieces{ .pawn = .init(.black, pos) },
+                            7 => return Pieces{ .rook = .black },
+                            8 => return Pieces{ .knight = .black },
+                            9 => return Pieces{ .bishop = .black },
+                            10 => return Pieces{ .queen = .black },
+                            11 => return Pieces{ .king = .init(.black) },
+                        }
+                    }
+                }
+            }
+
+            const char_arr: [12]u8 = .{
+                'p', 'r',
+                'k', 'b',
+                'q', 's',
+                'P', 'R',
+                'K', 'B',
+                'Q', 'S',
+            };
             pub fn bitboard_to_arr(self: BitBoard, pieces: [12]u64) [8][8]u8 { // column, row
                 _ = self;
                 const board_arr = blk: {
@@ -255,23 +299,29 @@ pub fn Chess() type {
                 }
             }
 
-            pub fn calculate_occupied(self: BitBoard) u64 {
-                const all_pieces: u64 = self.white_pawns | self.white_rooks | self.white_knights |
-                    self.white_bishops | self.white_queen | self.white_king | self.black_pawns |
-                    self.black_rooks | self.black_knights | self.black_bishops | self.black_queen |
-                    self.black_king;
-
+            pub fn calculate_all(self: BitBoard) u64 {
+                const all_pieces: u64 = self.white_pieces | self.black_pieces;
                 return all_pieces;
             }
 
             pub fn calculate_white(self: BitBoard) u64 {
-                const white_pieces: u64 = self.white_pawns | self.white_rooks | self.white_knights |
-                    self.white_bishops | self.white_queen | self.white_king;
+                const white_pieces: u64 = blk: {
+                    var white_pieces: u64 = undefined;
+                    for (self.pieces_arr, 0..) |piece, i| {
+                        white_pieces |= piece;
+                    }
+                    break :blk white_pieces;
+                };
                 return white_pieces;
             }
             pub fn calculate_black(self: BitBoard) u64 {
-                const black_pieces: u64 = self.black_pawns | self.black_rooks | self.black_knights |
-                    self.black_bishops | self.black_queen | self.black_king;
+                const black_pieces: u64 = blk: {
+                    var black_pieces: u64 = undefined;
+                    for (self.pieces_arr, 0..) |piece, i| {
+                        black_pieces |= piece;
+                    }
+                    break :blk black_pieces;
+                };
                 return black_pieces;
             }
 
