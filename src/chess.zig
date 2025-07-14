@@ -58,11 +58,11 @@ pub fn Chess() type {
         };
 
         pub const Pawns = struct {
-            pawns: [16]Pawn,
+            pawns: [16]?Pawn,
 
             pub fn init() Pawns {
                 const pawns = blk: {
-                    var pawns: [16]Pawn = undefined;
+                    var pawns: [16]Pawn = null;
                     for (0..pawns.len) |i| {
                         if (i < 8) {
                             const pos: u64 = @as(u64, 8) << @as(u6, @intCast(i));
@@ -77,16 +77,40 @@ pub fn Chess() type {
                 return Pawns{ .pawns = pawns };
             }
 
-            pub fn getPawn(self: Pawns, pos: u64) Pawn {
-                if ()
+            pub fn getPawn(self: Pawns, pos: u64) !Pawn {
+                for (self.pawns) |pawn_| {
+                    if (pawn_) |pawn| {
+                        if (pawn & pos != 0) {
+                            return pawn;
+                        }
+                    }
+                }
+                return error.NoPawnFound;
+            }
+            pub fn getPawnPtr(self: *Pawns, pos: u64) !*Pawn {
+                for (self.pawns) |*pawn_| {
+                    if (*pawn_) |*pawn| {
+                        if (pawn.* & pos != 0) {
+                            return pawn;
+                        }
+                    }
+                }
+                return error.NoPawnFound;
             }
 
-            pub fn removePawn(chess: Self, self: *BitBoard, pos: u64) void {
-                self.pieces_arr[0] = self.pieces_arr[0] & ~pos;
+            pub fn movePawn(bitboard: *BitBoard, from: u64, to: u64) void { 
+                removePawn(from);
+                bitboard.removePiece(to); // THIS IS WRONG, TRY TO WRAP HEAD AROUND IT
+
+                const pawn = try getPawnPtr(from); //movepwn
+                pawn.*.pos = to;
+                if (pawn.*.color == .white) bitboard.pieces_arr[0] | 
+                else 
+            }
+            fn removePawn(chess: Self, bitboard: *BitBoard, pos: u64) void {
+                bitboard.pieces_arr[0] = bitboard.pieces_arr[0] & ~pos;
                 for (chess.game.pawns) |*pawn| {
-                    if (pawn.* & pos != 0) {
-                        pawn.* = 0;
-                    }
+                    pawn.* = null;
                 }
             }
         };
