@@ -140,8 +140,35 @@ pub fn Chess() type {
                 const piece = getPiece(pos);
                 switch (piece) {
                     .pawn => if (piece.pawn.color == .white) {
-                        self.pieces_arr[0] 
-                    }
+                        self.pieces_arr[0] = self.pieces_arr[0] & ~pos;
+                    } else {
+                        self.pieces_arr[6] = self.pieces_arr[6] & ~pos;
+                    },
+                    .rook => if (piece.rook == .white) {
+                        self.pieces_arr[1] = self.pieces_arr[1] & ~pos;
+                    } else {
+                        self.pieces_arr[7] = self.pieces_arr[7] & ~pos;
+                    },
+                    .knight => if (piece.knight == .white) {
+                        self.pieces_arr[2] = self.pieces_arr[2] & ~pos;
+                    } else {
+                        self.pieces_arr[8] = self.pieces_arr[8] & ~pos;
+                    },
+                    .bishop => if (piece.bishop == .white) {
+                        self.pieces_arr[3] = self.pieces_arr[3] & ~pos;
+                    } else {
+                        self.pieces_arr[9] = self.pieces_arr[9] & ~pos;
+                    },
+                    .queen => if (piece.queen == .white) {
+                        self.pieces_arr[4] = self.pieces_arr[4] & ~pos;
+                    } else {
+                        self.pieces_arr[10] = self.pieces_arr[10] & ~pos;
+                    },
+                    .king => if (piece.king.color == .white) {
+                        self.pieces_arr[5] = self.pieces_arr[5] & ~pos;
+                    } else {
+                        self.pieces_arr[11] = self.pieces_arr[11] & ~pos;
+                    },
                 }
             }
 

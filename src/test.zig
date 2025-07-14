@@ -24,6 +24,11 @@ test {
 
     std.debug.print("{b}\n", .{a & b});
 
+    const c = 0b1111;
+    std.debug.print("{b}\n", .{c});
+
+    _ = removeBit(0b11100101, 2);
+
     const arr: [12]u8 = .{
         'r', 'R', // rook
         'h', 'H', // knight
