@@ -97,52 +97,83 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
             return Self{
                 .boardSize = boardSize,
                 .boardPos = boardPos,
-                .pieces = pieces,
+                .piecesTexture = pieces,
                 .chess = chess,
                 .bitboard_piece_array = bitboard_piece_array,
             };
         }
 
         pub fn deinit(self: Self) void {
-            for (self.pieces) |piece| {
+            for (self.piecesTexture) |piece| {
                 rl.unloadTexture(piece.texture);
             }
         }
 
         pub fn drawEmptyBoard(self: *const Self) void {
-            const cellSize = self.boardSize / 8;
+            const cellSize = @as(f32, @floatFromInt(self.boardSize / 8));
+
             for (0..64) |i| {
                 const row = i / 8;
                 const col = i % 8;
-                const color: rl.Color = if (i % 2 == 0) rl.Color.init(251, 247, 245, 255) else rl.Color.init(159, 221, 67, 255);
-                const pos = rl.Vector2.add(self.boardPos, rl.Vector2{ .x = col * cellSize, .y = row * cellSize });
-                rl.drawRectangleV(pos, rl.Vector2{ .x = cellSize, .y = cellSize }, color);
+
+                const cellColor = blk: {
+                    var cellColor: rl.Color = undefined;
+                    if (row % 2 == 0) {
+                        if (col % 2 == 0) {
+                            cellColor = rl.Color.dark_green;
+                        } else {
+                            cellColor = rl.Color.white;
+                        }
+                    } else {
+                        if (col % 2 == 0) {
+                            cellColor = rl.Color.white;
+                        } else {
+                            cellColor = rl.Color.dark_green;
+                        }
+                    }
+                    break :blk cellColor;
+                };
+
+                const pos = rl.Vector2.add(
+                    self.boardPos,
+                    rl.Vector2{
+                        .x = @as(f32, @floatFromInt(col)) * cellSize,
+                        .y = @as(f32, @floatFromInt(row)) * cellSize,
+                    },
+                );
+                rl.drawRectangleV(pos, rl.Vector2{ .x = cellSize, .y = cellSize }, cellColor);
             }
         }
 
-        pub fn drawBoard(self: *const Self) void {
+        pub fn drawBoard(self: *Self) void { // compiles but nothing is drawn, check when pieces are found with the ctz
             self.updateBitboardPieceArray();
-            const cellSize = self.boardSize / 8;
+            const cellSize = @as(f32, @floatFromInt(self.boardSize / 8));
             for (self.bitboard_piece_array) |piece| {
                 var bit: u64 = piece.bitboard;
-                var curr = 0;
+                var curr: u6 = 0;
                 while (bit != 0) {
-                    curr = @ctz(bit) + 1;
+                    curr = @as(u6, @intCast(@ctz(bit)));
 
                     const row = curr / 8;
                     const col = curr % 8;
-                    const origin: rl.Vector2 = rl.Vector2.add(self.boardPos, .init(col * cellSize, row * cellSize));
-                    const pieceTexture = PieceTexture.pieceTexFromEnumPiece(self, piece.piece_type);
+                    const origin: rl.Vector2 = rl.Vector2.add(
+                        self.boardPos,
+                        .init(
+                            @as(f32, @floatFromInt(col)) * cellSize,
+                            @as(f32, @floatFromInt(row)) * cellSize,
+                        ),
+                    );
+                    const pieceTexture = PieceTexture.pieceTexFromEnumPiece(self.*, piece.piece_type);
                     pieceTexture.draw(origin);
 
-                    // remove current bit and from bitboard and trail to next
+                    bit = bit & ~(@as(u64, 0b1) << @as(u6, curr));
                 }
             }
         }
         fn updateBitboardPieceArray(self: *Self) void {
             const pieces_arr = self.chess.bitboard.pieces_arr;
             for (0..pieces_arr.len) |i| {
-                self.bitboard_piece_array[i] = pieces_arr[i];
+                self.bitboard_piece_array[i].bitboard = pieces_arr[i];
             }
         }
 
