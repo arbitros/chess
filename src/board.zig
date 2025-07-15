@@ -1,23 +1,36 @@
 const rl = @import("raylib");
 const chessRules = @import("chess.zig");
+const Color = chessRules.Chess().Color;
 
 const PADDING: u32 = 80;
 
 pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
-    const BOARD_SIZE = 8;
-
     const WVH: bool = if (screenWidth > screenHeight) true;
-
     const boardSize = if (WVH) screenHeight - PADDING else screenWidth - PADDING;
+    const board_empty: bool = true;
 
     return struct {
         boardSize: u32,
         boardPos: rl.Vector2,
-        cellGrid: CellGrid,
-        pieces: [12]PieceTexture,
-        chess: chessRules.Chess(BOARD_SIZE),
+        piecesTexture: [12]PieceTexture,
+        chess: chessRules.Chess(),
+        bitboard_piece_array: [12]BitBoardPiece,
 
         const Self = @This();
+
+        pub const PieceType = union(enum) {
+            pawn: Color,
+            rook: Color,
+            knight: Color,
+            bishop: Color,
+            queen: Color,
+            king: Color,
+        };
+
+        pub const BitBoardPiece = struct {
+            bitboard: u64,
+            piece_type: PieceType,
+        };
 
         pub fn init() !Self {
             const pieces: [12]PieceTexture = blk: {
@@ -58,15 +71,35 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
                 .y = (screenHeight - screenWidth) / 2 + PADDING / 4,
             };
 
-            const chess = chessRules.Chess(BOARD_SIZE).initBase();
-            const cellGrid = CellGrid.init(boardPos, &chess, pieces);
+            const chess = chessRules.Chess().init(board_empty);
+
+            const bitboard_piece_array = blk: {
+                var pieces_arr: [12]BitBoardPiece = undefined;
+                for (0..pieces_arr.len) |i| {
+                    pieces_arr[i].bitboard = 0;
+                }
+                pieces_arr[0].piece_type = .{ .pawn = .white };
+                pieces_arr[1].piece_type = .{ .rook = .white };
+                pieces_arr[2].piece_type = .{ .knight = .white };
+                pieces_arr[3].piece_type = .{ .bishop = .white };
+                pieces_arr[4].piece_type = .{ .queen = .white };
+                pieces_arr[5].piece_type = .{ .king = .white };
+
+                pieces_arr[6].piece_type = .{ .pawn = .black };
+                pieces_arr[7].piece_type = .{ .rook = .black };
+                pieces_arr[8].piece_type = .{ .knight = .black };
+                pieces_arr[9].piece_type = .{ .bishop = .black };
+                pieces_arr[10].piece_type = .{ .queen = .black };
+                pieces_arr[11].piece_type = .{ .king = .black };
+                break :blk pieces_arr;
+            };
 
             return Self{
                 .boardSize = boardSize,
                 .boardPos = boardPos,
-                .cellGrid = cellGrid,
                 .pieces = pieces,
                 .chess = chess,
+                .bitboard_piece_array = bitboard_piece_array,
             };
         }
 
@@ -76,11 +109,40 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
             }
         }
 
+        pub fn drawEmptyBoard(self: *const Self) void {
+            const cellSize = self.boardSize / 8;
+            for (0..64) |i| {
+                const row = i / 8;
+                const col = i % 8;
+                const color: rl.Color = if (i % 2 == 0) rl.Color.init(251, 247, 245, 255) else rl.Color.init(159, 221, 67, 255);
+                const pos = rl.Vector2.add(self.boardPos, rl.Vector2{ .x = col * cellSize, .y = row * cellSize });
+                rl.drawRectangleV(pos, rl.Vector2{ .x = cellSize, .y = cellSize }, color);
+            }
+        }
+
         pub fn drawBoard(self: *const Self) void {
-            for (0..BOARD_SIZE) |i| {
-                for (0..BOARD_SIZE) |j| {
-                    self.cellGrid.cellGrid[i][j].draw();
+            self.updateBitboardPieceArray();
+            const cellSize = self.boardSize / 8;
+            for (self.bitboard_piece_array) |piece| {
+                var bit: u64 = piece.bitboard;
+                var curr = 0;
+                while (bit != 0) {
+                    curr = @ctz(bit) + 1;
+
+                    const row = curr / 8;
+                    const col = curr % 8;
+                    const origin: rl.Vector2 = rl.Vector2.add(self.boardPos, .init(col * cellSize, row * cellSize));
+                    const pieceTexture = PieceTexture.pieceTexFromEnumPiece(self, piece.piece_type);
+                    pieceTexture.draw(origin);
+
+                    // remove current bit and from bitboard and trail to next
                 }
+            }
+        }
+        fn updateBitboardPieceArray(self: *Self) void {
+            const pieces_arr = self.chess.bitboard.pieces_arr;
+            for (0..pieces_arr.len) |i| {
+                self.bitboard_piece_array[i] = pieces_arr[i];
             }
         }
 
@@ -93,7 +155,7 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
                 if (texture) |_texture| {
                     const widthF = @as(f32, @floatFromInt(_texture.width));
                     const heightF = @as(f32, @floatFromInt(_texture.height));
-                    const cellSizeF = @as(f32, @floatFromInt(boardSize / BOARD_SIZE));
+                    const cellSizeF = @as(f32, @floatFromInt(boardSize / 8));
 
                     const scale = if (widthF > heightF) 0.8 * cellSizeF / widthF else 0.8 * cellSizeF / heightF;
 
@@ -122,125 +184,50 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
                 rl.drawTextureEx(self.texture, pos, 0.0, self.scale, .white);
             }
 
-            pub fn pieceTexFromEnumPiece(pieces: [12]PieceTexture, piece: chessRules.Chess(BOARD_SIZE).Pieces) ?PieceTexture {
+            pub fn pieceTexFromEnumPiece(self: Self, piece: PieceType) PieceTexture {
                 switch (piece) {
                     .king => {
-                        if (piece.king.color == .white) {
-                            return pieces[0];
+                        if (piece.king == .white) {
+                            return self.piecesTexture[0];
                         } else {
-                            return pieces[6];
+                            return self.piecesTexture[6];
                         }
                     },
                     .queen => {
                         if (piece.queen == .white) {
-                            return pieces[1];
+                            return self.piecesTexture[1];
                         } else {
-                            return pieces[7];
+                            return self.piecesTexture[7];
                         }
                     },
                     .rook => {
                         if (piece.rook == .white) {
-                            return pieces[2];
+                            return self.piecesTexture[2];
                         } else {
-                            return pieces[8];
+                            return self.piecesTexture[8];
                         }
                     },
                     .bishop => {
                         if (piece.bishop == .white) {
-                            return pieces[3];
+                            return self.piecesTexture[3];
                         } else {
-                            return pieces[9];
+                            return self.piecesTexture[9];
                         }
                     },
                     .knight => {
                         if (piece.knight == .white) {
-                            return pieces[4];
+                            return self.piecesTexture[4];
                         } else {
-                            return pieces[10];
+                            return self.piecesTexture[10];
                         }
                     },
                     .pawn => {
-                        if (piece.pawn.color == .white) {
-                            return pieces[5];
+                        if (piece.pawn == .white) {
+                            return self.piecesTexture[5];
                         } else {
-                            return pieces[11];
+                            return self.piecesTexture[11];
                         }
                     },
-                    .none => return null,
-                }
-            }
-        };
-
-        const CellGrid = struct {
-            cellGrid: [BOARD_SIZE][BOARD_SIZE]Cell,
-
-            pub fn init(boardPos: rl.Vector2, board: *const chessRules.Chess(BOARD_SIZE), pieceTexArr: [12]PieceTexture) CellGrid {
-                const cellSize = boardSize / BOARD_SIZE;
-                const cellGrid = blk: {
-                    var cellGrid: [BOARD_SIZE][BOARD_SIZE]Cell = undefined;
-                    for (0..BOARD_SIZE) |i| {
-                        for (0..BOARD_SIZE) |j| {
-                            const pieceEnum = board.board[i][j];
-
-                            const pieceTex = PieceTexture.pieceTexFromEnumPiece(pieceTexArr, pieceEnum);
-
-                            const pos = rl.Vector2.add(boardPos, rl.Vector2{
-                                .x = @as(f32, @floatFromInt(cellSize * i)),
-                                .y = @as(f32, @floatFromInt(cellSize * j)),
-                            });
-
-                            const cellColor = blk2: {
-                                var cellColor: rl.Color = undefined;
-
-                                if (i % 2 == 0) {
-                                    if (j % 2 == 0) {
-                                        cellColor = rl.Color.dark_green;
-                                    } else {
-                                        cellColor = rl.Color.white;
-                                    }
-                                } else {
-                                    if (j % 2 == 0) {
-                                        cellColor = rl.Color.white;
-                                    } else {
-                                        cellColor = rl.Color.dark_green;
-                                    }
-                                }
-                                break :blk2 cellColor;
-                            };
-
-                            cellGrid[i][j] = Cell.init(pieceTex, pieceEnum, pos, cellColor);
-                        }
-                    }
-                    break :blk cellGrid;
-                };
-
-                return CellGrid{
-                    .cellGrid = cellGrid,
-                };
-            }
-        };
-
-        const Cell = struct {
-            pieceTex: ?PieceTexture,
-            piece: chessRules.Chess(BOARD_SIZE).Pieces,
-            pos: rl.Vector2,
-            color: rl.Color,
-
-            pub fn init(pieceTex: ?PieceTexture, piece: chessRules.Chess(BOARD_SIZE).Pieces, pos: rl.Vector2, color: rl.Color) Cell {
-                return Cell{
-                    .pieceTex = pieceTex,
-                    .piece = piece,
-                    .pos = pos,
-                    .color = color,
-                };
-            }
-            pub fn draw(self: *const Cell) void {
-                const cellSize = boardSize / BOARD_SIZE;
-                if (self.pieceTex) |pieceTex| {
-                    rl.drawRectangleV(self.pos, rl.Vector2.init(cellSize, cellSize), self.color);
-                    pieceTex.draw(self.pos);
-                } else {
-                    rl.drawRectangleV(self.pos, rl.Vector2.init(cellSize, cellSize), self.color);
                 }
             }
         };
@@ -250,10 +237,10 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
 test {
     const screenWidth = 1680;
     const screenHeight = 1320;
-
-    rl.initWindow(screenWidth, screenHeight, "Chess");
-    defer rl.closeWindow();
-    rl.setTargetFPS(60);
+    //
+    // rl.initWindow(screenWidth, screenHeight, "Chess");
+    // defer rl.closeWindow();
+    // rl.setTargetFPS(60);
 
     const chessType = try ChessBoard(screenWidth, screenHeight);
     const chessVar = try chessType.init();

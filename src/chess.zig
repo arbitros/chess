@@ -8,10 +8,11 @@ pub fn Chess() type {
 
         const Self = @This();
 
-        pub fn init() Self {
+        pub fn init(empty: bool) Self {
+            const game: Game = if (empty) std.mem.zeroes(Game) else Game.init();
             return Self{
-                .bitboard = BitBoard{},
-                .game = Game.init(),
+                .bitboard = BitBoard.init(empty),
+                .game = game,
             };
         }
 
@@ -142,21 +143,76 @@ pub fn Chess() type {
             const black_queen: u64 = 0b0001_0000 << RANK * 7;
             const black_king: u64 = 0b0000_1000 << RANK * 7;
 
-            white_pieces: u64 = white_pawns | white_rooks | white_knights | white_bishops | white_queen | white_king,
-            black_pieces: u64 = black_pawns | black_rooks | black_knights | black_bishops | black_queen | black_king,
-            all_pieces: u64 = black_pawns | black_rooks | black_knights | black_bishops | black_queen | black_king | white_pawns | white_rooks | white_knights | white_bishops | white_queen | white_king,
+            white_pieces: u64,
+            black_pieces: u64,
+            all_pieces: u64,
+            pieces_arr: [12]u64,
 
-            pieces_arr: [12]u64 = std.mem.zeroes([12]u64),
+            pub fn init(empty: bool) BitBoard {
+                const pieces_arr: [12]u64 = if (empty) std.mem.zeroes([12]u64) else blk: {
+                    var pieces_arr: [12]u64 = undefined;
+                    pieces_arr[0] = white_pawns;
+                    pieces_arr[1] = white_rooks;
+                    pieces_arr[2] = white_knights;
+                    pieces_arr[3] = white_bishops;
+                    pieces_arr[4] = white_queen;
+                    pieces_arr[5] = white_king;
 
-            pub fn attackPiece(chess: Self, self: *BitBoard, attacker: u64, victim: u64) !bool {
-                _ = chess;
-                const attack_piece = try getPiece(attacker);
-                _ = try getPiece(victim);
-                const attack_field = getAttack(attacker, attack_piece);
+                    pieces_arr[6] = black_pawns;
+                    pieces_arr[7] = black_rooks;
+                    pieces_arr[8] = black_knights;
+                    pieces_arr[9] = black_bishops;
+                    pieces_arr[10] = black_queen;
+                    pieces_arr[11] = black_king;
+                    break :blk pieces_arr;
+                };
+
+                const white_pieces: u64 = if (empty) 0 else white_pawns | white_rooks | white_knights | white_bishops | white_queen | white_king;
+                const black_pieces: u64 = if (empty) 0 else black_pawns | black_rooks | black_knights | black_bishops | black_queen | black_king;
+
+                return BitBoard{
+                    .white_pieces = white_pieces,
+                    .black_pieces = black_pieces,
+                    .all_pieces = white_pieces | black_pieces,
+                    .pieces_arr = pieces_arr,
+                };
+            }
+
+            pub fn addPiece(self: *BitBoard, pos: u64, piece: Pieces) void {
+                switch (piece) {
+                    .rook => if (piece.rook == .white) {
+                        self.pieces_arr[1] = self.pieces_arr[1] | pos;
+                    } else {
+                        self.pieces_arr[7] = self.pieces_arr[7] | pos;
+                    },
+                    .knight => if (piece.knight == .white) {
+                        self.pieces_arr[2] = self.pieces_arr[2] | pos;
+                    } else {
+                        self.pieces_arr[8] = self.pieces_arr[8] | pos;
+                    },
+                    .bishop => if (piece.bishop == .white) {
+                        self.pieces_arr[3] = self.pieces_arr[3] | pos;
+                    } else {
+                        self.pieces_arr[9] = self.pieces_arr[9] | pos;
+                    },
+                    .queen => if (piece.queen == .white) {
+                        self.pieces_arr[4] = self.pieces_arr[4] | pos;
+                    } else {
+                        self.pieces_arr[10] = self.pieces_arr[10] | pos;
+                    },
+                    else => {},
+                }
+                self.update_board_occupancy();
+            }
+
+            pub fn attackPiece(self: *BitBoard, chess: *Self, attacker: u64, victim: u64) !bool {
+                const attack_piece = try self.getPiece(attacker);
+                _ = try self.getPiece(victim);
+                const attack_field = self.getAttack(attacker, attack_piece);
 
                 if (victim & attack_field != 0) {
-                    self.removePiece(victim);
-                    self.movePiece(attacker, victim);
+                    try self.removePiece(chess, victim);
+                    try self.movePiece(chess, attacker, victim);
                     return true;
                 } else {
                     return false;
@@ -202,9 +258,7 @@ pub fn Chess() type {
                             else => {},
                         }
                     }
-                    self.black_pieces = self.calculate_black();
-                    self.white_pieces = self.calculate_white();
-                    self.all_pieces = self.calculate_all();
+                    self.update_board_occupancy();
                 } else return error.NotLegalMove;
             }
             pub fn removePiece(self: *BitBoard, chess: *Self, pos: u64) !void {
@@ -233,17 +287,15 @@ pub fn Chess() type {
                     .pawn => Chess().Pawns.removePawn(chess, self, pos),
                     else => {},
                 }
-                self.black_pieces = self.calculate_black();
-                self.white_pieces = self.calculate_white();
-                self.all_pieces = self.calculate_all();
+                self.update_board_occupancy();
             }
 
             pub fn getPiece(self: *const BitBoard, pos: u64) !Pieces {
                 for (self.pieces_arr, 0..) |piece_pos, i| {
                     if (piece_pos & pos != 0) {
                         switch (i) {
-                            0 => return Pieces{ .pawn = .init(.white, pos) },
                             1 => return Pieces{ .rook = .white },
+                            0 => return Pieces{ .pawn = .init(.white, pos) },
                             2 => return Pieces{ .knight = .white },
                             3 => return Pieces{ .bishop = .white },
                             4 => return Pieces{ .queen = .white },
@@ -348,9 +400,9 @@ pub fn Chess() type {
 
             pub fn calculate_white(self: BitBoard) u64 {
                 const white_pieces: u64 = blk: {
-                    var white_pieces: u64 = undefined;
-                    for (self.pieces_arr) |piece| {
-                        white_pieces |= piece;
+                    var white_pieces: u64 = 0;
+                    for (self.pieces_arr, 0..) |piece, i| {
+                        if (i < 6) white_pieces |= piece;
                     }
                     break :blk white_pieces;
                 };
@@ -358,29 +410,19 @@ pub fn Chess() type {
             }
             pub fn calculate_black(self: BitBoard) u64 {
                 const black_pieces: u64 = blk: {
-                    var black_pieces: u64 = undefined;
-                    for (self.pieces_arr) |piece| {
-                        black_pieces |= piece;
+                    var black_pieces: u64 = 0;
+                    for (self.pieces_arr, 0..) |piece, i| {
+                        if (i > 5) black_pieces |= piece;
                     }
                     break :blk black_pieces;
                 };
                 return black_pieces;
             }
 
-            pub fn calculate_array(self: *BitBoard) void {
-                self.pieces_arr[0] = white_pawns;
-                self.pieces_arr[1] = white_rooks;
-                self.pieces_arr[2] = white_knights;
-                self.pieces_arr[3] = white_bishops;
-                self.pieces_arr[4] = white_queen;
-                self.pieces_arr[5] = white_king;
-
-                self.pieces_arr[6] = black_pawns;
-                self.pieces_arr[7] = black_rooks;
-                self.pieces_arr[8] = black_knights;
-                self.pieces_arr[9] = black_bishops;
-                self.pieces_arr[10] = black_queen;
-                self.pieces_arr[11] = black_king;
+            pub fn update_board_occupancy(self: *BitBoard) void {
+                self.white_pieces = self.calculate_white();
+                self.black_pieces = self.calculate_black();
+                self.all_pieces = self.calculate_all();
             }
 
             pub fn getAttack(self: *const BitBoard, pos_in: u64, piece: Pieces) u64 {
@@ -617,27 +659,30 @@ pub fn Chess() type {
 
 test {
     const chessType = Chess();
-    var chess = chessType.init();
+    var chess = chessType.init(true);
 
-    const black = chess.bitboard.calculate_black();
-    const white = chess.bitboard.calculate_white();
-    _ = black;
-    _ = white;
-
-    chess.bitboard.calculate_array();
     chess.bitboard.drawBitBoard();
 
-    var chesstest = Chess(){ // get a clean board when testing attacks of pieces
-        .bitboard = std.mem.zeroes(chessType.BitBoard),
-        .game = std.mem.zeroes(chessType.Game),
-    };
+    var chesstest = Chess().init(true);
 
-    const RANK = 8;
-    chesstest.bitboard.pieces_arr[1] |= 1;
+    // const RANK = 8;
+    // const pos =
+    // chesstest.bitboard.addPiece(0b1, .{ .rook = .white });
+    // chesstest.bitboard.drawBitBoard();
+    // try chesstest.bitboard.movePiece(&chesstest, 1, 0b1 << RANK * 3);
+    // chesstest.bitboard.drawBitBoard();
+    // try chesstest.bitboard.movePiece(&chesstest, 0b1 << RANK * 3, 0b1 << RANK * 3 << 7);
+    // chesstest.bitboard.drawBitBoard();
+    // try chesstest.bitboard.movePiece(&chesstest, 0b1 << RANK * 3 << 7, 0b1 << RANK * 3 << 2);
+    // chesstest.bitboard.drawBitBoard();
+
+    chesstest.bitboard.addPiece(0b1, .{ .rook = .black });
+    chesstest.bitboard.addPiece(0b10, .{ .knight = .white });
     chesstest.bitboard.drawBitBoard();
-    try chesstest.bitboard.movePiece(&chesstest, 1, 0b1 << RANK * 5);
-    try chesstest.bitboard.movePiece(&chesstest, 0b1 << RANK * 5, RANK * 5 << 5); // något skumt händer
+    const attackBool = try chesstest.bitboard.attackPiece(&chesstest, 0b1, 0b10);
+    _ = attackBool;
     chesstest.bitboard.drawBitBoard();
+
     {
         // const pawnattack = chesstest.bitboard.attacks(0b1 << 33, piece);
         // chessType.BitBoard.draw_attack(pawnattack);
@@ -693,6 +738,7 @@ test {
 
     for (0..64) |i| {
         const rookattack = chesstest.bitboard.getAttack(@as(u64, 0b1) << @as(u6, @intCast(i)), chessType.Pieces{ .rook = .white });
+        // std.debug.print("\x1b[2J\x1b[H", .{});
         // chessType.BitBoard.draw_attack(rookattack);
         // std.time.sleep(220 * std.time.ns_per_ms);
         _ = rookattack;

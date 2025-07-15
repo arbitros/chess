@@ -27,7 +27,8 @@ test {
     const c = 0b1111;
     std.debug.print("{b}\n", .{c});
 
-    _ = removeBit(0b11100101, 2);
+    const d: u64 = 0b10000;
+    std.debug.print("{d}\n", .{@ctz(d)});
 
     const arr: [12]u8 = .{
         'r', 'R', // rook
