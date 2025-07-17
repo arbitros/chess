@@ -7,7 +7,7 @@ const PADDING: u32 = 80;
 pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
     const WVH: bool = if (screenWidth > screenHeight) true;
     const boardSize = if (WVH) screenHeight - PADDING else screenWidth - PADDING;
-    const board_empty: bool = true;
+    const board_empty: bool = false;
 
     return struct {
         boardSize: u32,
@@ -15,8 +15,46 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
         piecesTexture: [12]PieceTexture,
         chess: chessRules.Chess(),
         bitboard_piece_array: [12]BitBoardPiece,
+        player: Player,
 
         const Self = @This();
+
+        pub const Player = struct {
+            piece_from: u64,
+            piece_to: u64,
+
+            pub fn getHoveredBit(self: Self) u64 {
+                const mousePos = rl.getMousePosition();
+                const inBounds =
+                    mousePos.x > self.boardPos.x and
+                    mousePos.x < self.boardPos.x + @as(f32, @floatFromInt(self.boardSize)) and
+                    mousePos.y > self.boardPos.y and
+                    mousePos.y < self.boardPos.y + @as(f32, @floatFromInt(self.boardSize));
+                if (inBounds) {
+                    const cellSize = @as(f32, @floatFromInt(self.boardSize / 8));
+                    const a = rl.Vector2.subtract(mousePos, self.boardPos);
+                    const row = @as(u6, @intFromFloat(a.y / cellSize));
+                    const col = @as(u6, @intFromFloat(a.x / cellSize));
+                    const bit_pos: u64 = @as(u64, 0b1) << (row * 8) + col;
+                    return bit_pos;
+                } else return 0;
+            }
+
+            pub fn attackPiece(self: *Player, board: *Self) !void {
+                if (rl.isMouseButtonPressed(.left)) {
+                    self.piece_from = Player.getHoveredBit(board.*);
+                }
+                if (rl.isMouseButtonPressed(.right)) {
+                    self.piece_to = Player.getHoveredBit(board.*);
+                }
+
+                if (self.piece_from != 0 and self.piece_to != 0) {
+                    try board.chess.bitboard.attackPiece(&board.chess, self.piece_from, self.piece_to);
+                    self.piece_from = 0;
+                    self.piece_to = 0;
+                }
+            }
+        };
 
         pub const PieceType = union(enum) {
             pawn: Color,
@@ -94,12 +132,15 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
                 break :blk pieces_arr;
             };
 
+            const player = Self.Player{ .piece_from = 0, .piece_to = 0 };
+
             return Self{
                 .boardSize = boardSize,
                 .boardPos = boardPos,
                 .piecesTexture = pieces,
                 .chess = chess,
                 .bitboard_piece_array = bitboard_piece_array,
+                .player = player,
             };
         }
 
@@ -122,11 +163,11 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
                         if (col % 2 == 0) {
                             cellColor = rl.Color.dark_green;
                         } else {
-                            cellColor = rl.Color.white;
+                            cellColor = rl.Color.init(249, 241, 241, 255);
                         }
                     } else {
                         if (col % 2 == 0) {
-                            cellColor = rl.Color.white;
+                            cellColor = rl.Color.init(249, 241, 241, 255);
                         } else {
                             cellColor = rl.Color.dark_green;
                         }
@@ -145,7 +186,7 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
             }
         }
 
-        pub fn drawBoard(self: *Self) void { // compiles but nothing is drawn, check when pieces are found with the ctz
+        pub fn drawBoard(self: *Self) void { // compiles but crashes if there are pieces on the board
             self.updateBitboardPieceArray();
             const cellSize = @as(f32, @floatFromInt(self.boardSize / 8));
             for (self.bitboard_piece_array) |piece| {
@@ -166,7 +207,7 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
                     const pieceTexture = PieceTexture.pieceTexFromEnumPiece(self.*, piece.piece_type);
                     pieceTexture.draw(origin);
 
-                    bit = bit & ~(@as(u64, 0b1) << @as(u6, curr));
+                    bit &= bit - 1;
                 }
             }
         }

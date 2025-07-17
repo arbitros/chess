@@ -1,5 +1,6 @@
 const rl = @import("raylib");
 const chessBoard = @import("board.zig");
+const std = @import("std");
 
 pub fn main() anyerror!void {
     const screenWidth = 1640;
@@ -17,6 +18,7 @@ pub fn main() anyerror!void {
 
         chessVar.drawEmptyBoard();
         chessVar.drawBoard();
+        try chessVar.player.attackPiece(&chessVar);
 
         defer rl.endDrawing();
 
