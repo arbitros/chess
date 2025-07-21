@@ -16,9 +16,7 @@ pub fn main() anyerror!void {
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
 
-        chessVar.drawEmptyBoard();
-        chessVar.drawBoard();
-        try chessVar.player.attackPiece(&chessVar);
+        try chessVar.update();
 
         defer rl.endDrawing();
 

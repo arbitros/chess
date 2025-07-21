@@ -1,6 +1,7 @@
 const rl = @import("raylib");
 const chessRules = @import("chess.zig");
 const Color = chessRules.Chess().Color;
+const std = @import("std");
 
 const PADDING: u32 = 80;
 
@@ -22,6 +23,7 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
         pub const Player = struct {
             piece_from: u64,
             piece_to: u64,
+            turn: chessRules.Chess().Color,
 
             pub fn getHoveredBit(self: Self) u64 {
                 const mousePos = rl.getMousePosition();
@@ -55,6 +57,47 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
                 }
             }
         };
+        pub fn drawAttackField(self: *Self, player: *const Player) !void {
+            const hovered_bit = player.piece_from;
+            if (hovered_bit == 0) return;
+            const piece = try self.chess.bitboard.getPiece(hovered_bit);
+            const attack_field = try self.chess.bitboard.getAttack(self.chess, hovered_bit, piece);
+
+            const color = blk: {
+                var color: Color = undefined;
+                switch (piece) {
+                    .pawn => color = piece.pawn.color,
+                    .rook => color = piece.rook,
+                    .knight => color = piece.knight,
+                    .bishop => color = piece.bishop,
+                    .queen => color = piece.queen,
+                    .king => color = piece.pawn.color,
+                }
+                break :blk color;
+            };
+            if (self.chess.game.turn == color) {
+                const cellSize = @as(f32, @floatFromInt(self.boardSize / 8));
+
+                var bit: u64 = attack_field;
+                var curr: u6 = 0;
+                while (bit != 0) {
+                    curr = @as(u6, @intCast(@ctz(bit)));
+
+                    const row = curr / 8;
+                    const col = curr % 8;
+                    const pos: rl.Vector2 = rl.Vector2.add(
+                        self.boardPos,
+                        .init(
+                            @as(f32, @floatFromInt(col)) * cellSize,
+                            @as(f32, @floatFromInt(row)) * cellSize,
+                        ),
+                    );
+                    rl.drawRectangleV(pos, rl.Vector2{ .x = cellSize, .y = cellSize }, rl.Color.blue);
+
+                    bit &= bit - 1;
+                }
+            }
+        }
 
         pub const PieceType = union(enum) {
             pawn: Color,
@@ -69,6 +112,14 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
             bitboard: u64,
             piece_type: PieceType,
         };
+
+        pub fn update(self: *Self) !void {
+            self.drawEmptyBoard();
+            const player = &self.player;
+            self.drawAttackField(player) catch {};
+            self.drawBoard();
+            self.player.attackPiece(self) catch {};
+        }
 
         pub fn init() !Self {
             const pieces: [12]PieceTexture = blk: {
@@ -132,7 +183,7 @@ pub fn ChessBoard(screenWidth: u32, screenHeight: u32) anyerror!type {
                 break :blk pieces_arr;
             };
 
-            const player = Self.Player{ .piece_from = 0, .piece_to = 0 };
+            const player = Self.Player{ .piece_from = 0, .piece_to = 0, .turn = .white };
 
             return Self{
                 .boardSize = boardSize,

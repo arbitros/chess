@@ -18,7 +18,7 @@ pub fn Chess() type {
 
         pub const Game = struct {
             turn: Color,
-            kings: [2]King,
+            kings: Kings,
             pawns: Pawns,
 
             pub fn init() Game {
@@ -42,6 +42,53 @@ pub fn Chess() type {
         pub const Color = enum {
             black,
             white,
+        };
+
+        pub const Kings = struct {
+            kings: [2]King,
+
+            pub fn init() Kings {
+                const kings: [2]King = .{King.init(.white), King.init(.black)};
+                return Kings {
+                    .kings = kings,
+                };
+            }
+
+            pub fn getKing(self: Kings, pos: u64) !Kings {
+                for (self.kings) |king| {
+                    if (king.pos & pos != 0) {
+                        return king;
+                    }
+                }
+                return error.NoKingFound;
+            }
+            pub fn getKingPtr(self: *Kings, pos: u64) !*Kings {
+                for (&self.kings) |*king| {
+                    if (king.pos & pos != 0) {
+                        return king;
+                    }
+                }
+                return error.NoKingFound;
+            }
+
+            pub fn kingRules(board: Self) void {
+            }
+
+            fn isCheck(board: Self, color: Color) !bool {
+                if (turn != color) return error.WrongTurn;
+
+                if (color == .white) {
+                    var bit: u64 = board.bitboard.black_pieces;
+                    var curr: u6 = 0;
+                    var current_piece: Pieces = undefined;
+                    while (bit != 0) {
+                        curr = @as(u6, @intCast(@ctz(bit)));
+
+                        bit &= bit - 1;
+                    }
+
+                }
+            }
         };
 
         pub const Pawns = struct {
@@ -137,10 +184,13 @@ pub fn Chess() type {
         pub const King = struct { // SPEICAL RULES: Check, Checkmate, Castle
             color: Color,
             hasMoved: bool,
+            inCheck: bool,
+
             pub fn init(color: Color) King {
                 return King{
                     .color = color,
                     .hasMoved = false,
+                    .inCheck = false,
                 };
             }
         };
@@ -230,60 +280,79 @@ pub fn Chess() type {
             }
             pub fn attackPiece(self: *BitBoard, chess: *Self, attacker: u64, victim: u64) !void {
                 const attack_piece = try self.getPiece(attacker);
-                _ = self.getPiece(victim) catch {
-                    try self.movePiece(chess, attacker, victim);
-                    return;
+                const color = blk: {
+                    var color: Color = undefined;
+                    switch (attack_piece) {
+                        .pawn => color = attack_piece.pawn.color,
+                        .rook => color = attack_piece.rook,
+                        .knight => color = attack_piece.knight,
+                        .bishop => color = attack_piece.bishop,
+                        .queen => color = attack_piece.queen,
+                        .king => color = attack_piece.pawn.color,
+                    }
+                    break :blk color;
                 };
-                const attack_field = try self.getAttack(chess.*, attacker, attack_piece);
 
-                if (victim & attack_field != 0) {
-                    try self.removePiece(chess, victim);
-                    try self.movePiece(chess, attacker, victim);
-                }
+                if (chess.game.turn == color) {
+                    const attack_field = try self.getAttack(chess.*, attacker, attack_piece);
+
+                    _ = self.getPiece(victim) catch {
+                        try self.movePiece(chess, attacker, victim, attack_field);
+                        if (color == .white) chess.game.turn = .black else chess.game.turn = .white;
+                        return;
+                    };
+
+                    if (victim & attack_field != 0) {
+                        try self.removePiece(chess, victim);
+                        try self.movePiece(chess, attacker, victim, attack_field);
+                        if (color == .white) chess.game.turn = .black else chess.game.turn = .white;
+                    }
+                } // contuinue
             }
 
-            pub fn movePiece(self: *BitBoard, chess: *Self, from: u64, to: u64) !void {
+            pub fn movePiece(self: *BitBoard, chess: *Self, from: u64, to: u64, attack_field: u64) !void {
                 const piece = try self.getPiece(from);
-                const attack_field = try self.getAttack(chess.*, from, piece);
-                if (to & attack_field != 0) {
-                    if (piece == .pawn) try Chess().Pawns.movePawn(chess, self, from, to) else {
-                        switch (piece) {
-                            .rook => if (piece.rook == .white) {
-                                try self.removePiece(chess, from);
-                                self.pieces_arr[1] = self.pieces_arr[1] | to;
-                            } else {
-                                try self.removePiece(chess, from);
-                                self.pieces_arr[7] = self.pieces_arr[7] | to;
-                            },
-                            .knight => if (piece.knight == .white) {
-                                try self.removePiece(chess, from);
-                                self.pieces_arr[2] = self.pieces_arr[2] | to;
-                            } else {
-                                try self.removePiece(chess, from);
-                                self.pieces_arr[8] = self.pieces_arr[8] | to;
-                            },
-                            .bishop => if (piece.bishop == .white) {
-                                try self.removePiece(chess, from);
-                                self.pieces_arr[3] = self.pieces_arr[3] | to;
-                            } else {
-                                try self.removePiece(chess, from);
-                                self.pieces_arr[9] = self.pieces_arr[9] | to;
-                            },
-                            .queen => if (piece.queen == .white) {
-                                try self.removePiece(chess, from);
-                                self.pieces_arr[4] = self.pieces_arr[4] | to;
-                            } else {
-                                try self.removePiece(chess, from);
-                                self.pieces_arr[10] = self.pieces_arr[10] | to;
-                            },
-                            .pawn => {
-                                try Chess().Pawns.movePawn(chess, self, from, to);
-                            },
-                            else => {},
+                const isLegal = (attack_field & to) != 0;
+                if (isLegal) {
+                    switch (piece) {
+                        .rook => if (piece.rook == .white) {
+                            try self.removePiece(chess, from);
+                            self.pieces_arr[1] = self.pieces_arr[1] | to;
+                        } else {
+                            try self.removePiece(chess, from);
+                            self.pieces_arr[7] = self.pieces_arr[7] | to;
+                        },
+                        .knight => if (piece.knight == .white) {
+                            try self.removePiece(chess, from);
+                            self.pieces_arr[2] = self.pieces_arr[2] | to;
+                        } else {
+                            try self.removePiece(chess, from);
+                            self.pieces_arr[8] = self.pieces_arr[8] | to;
+                        },
+                        .bishop => if (piece.bishop == .white) {
+                            try self.removePiece(chess, from);
+                            self.pieces_arr[3] = self.pieces_arr[3] | to;
+                        } else {
+                            try self.removePiece(chess, from);
+                            self.pieces_arr[9] = self.pieces_arr[9] | to;
+                        },
+                        .queen => if (piece.queen == .white) {
+                            try self.removePiece(chess, from);
+                            self.pieces_arr[4] = self.pieces_arr[4] | to;
+                        } else {
+                            try self.removePiece(chess, from);
+                            self.pieces_arr[10] = self.pieces_arr[10] | to;
+                        },
+                        .pawn => {
+                            try Chess().Pawns.movePawn(chess, self, from, to);
+                        },
+                        .king => {
+                            ret Chess().
                         }
                     }
-                    self.update_board_occupancy();
-                } else return error.NotLegalMove;
+                }
+
+                self.update_board_occupancy();
             }
             pub fn removePiece(self: *BitBoard, chess: *Self, pos: u64) !void {
                 const piece = try self.getPiece(pos);
@@ -559,7 +628,9 @@ pub fn Chess() type {
 
                     if (self.all_pieces & pos != 0) {
                         const is_enemy = self.isEnemy(pos, color);
-                        if (is_enemy) attack_field |= pos;
+                        if (is_enemy) {
+                            attack_field |= pos;
+                        }
                         continue;
                     }
 
@@ -611,10 +682,10 @@ pub fn Chess() type {
                     if (dir > 0) pos <<= @as(u6, @intCast(dir)) else pos >>= @as(u6, @intCast(-dir));
                     if (pos == 0) continue;
 
-                    if (self.all_pieces & pos != 0) {
+                    if ((self.all_pieces & pos) != 0) {
                         const is_enemy = self.isEnemy(pos, color);
                         if (is_enemy) attack_field |= pos;
-                        std.debug.print("DIAG: attack_pos: {b}, pos_in: {b}\n", .{ pos, pos_in });
+                        continue;
                     }
                 }
 
